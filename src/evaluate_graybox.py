@@ -64,6 +64,38 @@ def plot_comparison(blackbox_curves: dict[str, np.ndarray], graybox_curves: dict
     print(f"saved {OUT_DIR}/graybox_comparison.png")
 
 
+def plot_theta_trajectory(
+    blackbox: AutoregressiveModel, graybox: AutoregressiveModel, conditions: dict[str, np.ndarray]
+) -> None:
+    """代表IC1点でのtheta1(t), theta2(t)を真値・ブラックボックス・グレーボックスで比較する。"""
+    rng = np.random.default_rng(SEED_TEST)
+    ic = sample_initial_states(1, rng)[0]
+    t = np.arange(N_STEPS_EVAL + 1) * DT
+
+    fig, axes = plt.subplots(2, len(conditions), figsize=(6 * len(conditions), 8), squeeze=False)
+    for col, (label, tau_seq) in enumerate(conditions.items()):
+        true_traj = true_rollout(ic[None, :], DT, N_STEPS_EVAL, tau_seq=tau_seq)[0]
+        blackbox_traj = blackbox.rollout(ic, N_STEPS_EVAL, tau_seq=tau_seq)
+        graybox_traj = graybox.rollout(ic, N_STEPS_EVAL, tau_seq=tau_seq)
+
+        for row, joint_label in enumerate(["theta1", "theta2"]):
+            ax = axes[row, col]
+            ax.plot(t, np.unwrap(true_traj[:, row]), label="真値", linewidth=1.5)
+            ax.plot(t, np.unwrap(blackbox_traj[:, row]), "--", label="ブラックボックス", linewidth=1.2)
+            ax.plot(t, np.unwrap(graybox_traj[:, row]), "--", label="グレーボックス", linewidth=1.2)
+            ax.axvline(CURRICULUM[-1][0] * DT, color="gray", linestyle=":", linewidth=1)
+            ax.set_xlabel("time [s]")
+            ax.set_ylabel(f"{joint_label} [rad]")
+            ax.set_title(f"{label} ({joint_label})", fontsize=10)
+            ax.legend(fontsize=8)
+
+    fig.suptitle(f"角度の時系列比較 (IC: θ1={ic[0]:.2f}, θ2={ic[1]:.2f}, θ̇1={ic[2]:.2f}, θ̇2={ic[3]:.2f})")
+    plt.tight_layout()
+    plt.savefig(f"{OUT_DIR}/theta_trajectory.png", dpi=150)
+    plt.close()
+    print(f"saved {OUT_DIR}/theta_trajectory.png")
+
+
 if __name__ == "__main__":
     conditions = make_control_conditions()
 
@@ -79,6 +111,7 @@ if __name__ == "__main__":
     graybox_curves = rmse_at_horizon(graybox, conditions)
 
     plot_comparison(blackbox_curves, graybox_curves)
+    plot_theta_trajectory(blackbox, graybox, conditions)
 
     print(f"\n=== 開ループロールアウトRMSE (t={N_STEPS_EVAL*DT:.1f}s) ===")
     for label in blackbox_curves:
