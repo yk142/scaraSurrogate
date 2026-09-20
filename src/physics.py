@@ -4,9 +4,13 @@
 運動方程式:
     M(q) q_ddot + C(q, q_dot) q_dot + F(q_dot) = tau
 
-水平面内の運動のため重力項はない。F(q_dot) は粘性摩擦のみ(デフォルト0)。
+水平面内の運動のため重力項はない。F(q_dot) は粘性摩擦+クーロン摩擦(各関節独立)。
 リンクは一様棒として lc = l/2 (重心は中点), I = m*l^2/12 (重心まわりの慣性モーメント)
 をデフォルトパラメータとする。
+
+摩擦係数はデフォルトで非ゼロ(M2 #3): 姉妹プロジェクト surrogateRolloutVerification
+のM15で「グレーボックスが既知として持たない未知項(摩擦)」を後から追加する必要が
+あったため、本プロジェクトでは最初から真の系に含めておく。
 """
 import numpy as np
 
@@ -20,7 +24,9 @@ LC2 = L2 / 2  # リンク2の重心位置(関節2からの距離)
 I1 = M1 * L1**2 / 12  # リンク1の重心まわり慣性モーメント
 I2 = M2 * L2**2 / 12  # リンク2の重心まわり慣性モーメント
 
-C_VISCOUS = 0.0  # 粘性摩擦係数(デフォルトは無摩擦、M1では0)
+# 各関節の摩擦(粘性 + クーロン)。グレーボックスモデルが既知として持たない未知項。
+C_VISCOUS = np.array([0.05, 0.05])
+C_COULOMB = np.array([0.02, 0.02])
 
 
 def mass_matrix(q2: np.ndarray) -> np.ndarray:
@@ -52,7 +58,22 @@ def coriolis_matrix(q2: np.ndarray, q1_dot: np.ndarray, q2_dot: np.ndarray) -> n
     return np.stack([row0, row1], axis=-2)
 
 
-def dynamics(state: np.ndarray, tau: np.ndarray, c: float = C_VISCOUS) -> np.ndarray:
+def friction_torque(
+    q_dot: np.ndarray, c_viscous: np.ndarray = C_VISCOUS, c_coulomb: np.ndarray = C_COULOMB
+) -> np.ndarray:
+    """関節摩擦トルク(粘性+クーロン、各関節独立)。グレーボックスが学ぶべき未知項。
+
+    q_dot: shape (..., 2) -> shape (..., 2)
+    """
+    return c_viscous * q_dot + c_coulomb * np.sign(q_dot)
+
+
+def dynamics(
+    state: np.ndarray,
+    tau: np.ndarray,
+    c_viscous: np.ndarray = C_VISCOUS,
+    c_coulomb: np.ndarray = C_COULOMB,
+) -> np.ndarray:
     """状態の時間微分 dx/dt を返す。
 
     state: shape (..., 4) = [theta1, theta2, theta1_dot, theta2_dot]
@@ -66,19 +87,24 @@ def dynamics(state: np.ndarray, tau: np.ndarray, c: float = C_VISCOUS) -> np.nda
     M = mass_matrix(q2)
     C = coriolis_matrix(q2, q1_dot, q2_dot)
 
-    friction = c * q_dot
-    rhs = tau - np.einsum("...ij,...j->...i", C, q_dot) - friction
+    rhs = tau - np.einsum("...ij,...j->...i", C, q_dot) - friction_torque(q_dot, c_viscous, c_coulomb)
     q_ddot = np.linalg.solve(M, rhs)
 
     return np.concatenate([q_dot, q_ddot], axis=-1)
 
 
-def rk4_step(state: np.ndarray, dt: float, tau: np.ndarray, c: float = C_VISCOUS) -> np.ndarray:
+def rk4_step(
+    state: np.ndarray,
+    dt: float,
+    tau: np.ndarray,
+    c_viscous: np.ndarray = C_VISCOUS,
+    c_coulomb: np.ndarray = C_COULOMB,
+) -> np.ndarray:
     """RK4で1ステップ積分する。tau はこのステップ内で一定とみなす。"""
-    k1 = dynamics(state, tau, c)
-    k2 = dynamics(state + 0.5 * dt * k1, tau, c)
-    k3 = dynamics(state + 0.5 * dt * k2, tau, c)
-    k4 = dynamics(state + dt * k3, tau, c)
+    k1 = dynamics(state, tau, c_viscous, c_coulomb)
+    k2 = dynamics(state + 0.5 * dt * k1, tau, c_viscous, c_coulomb)
+    k3 = dynamics(state + 0.5 * dt * k2, tau, c_viscous, c_coulomb)
+    k4 = dynamics(state + dt * k3, tau, c_viscous, c_coulomb)
     return state + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
 
 
@@ -87,7 +113,8 @@ def simulate(
     dt: float,
     n_steps: int,
     tau: np.ndarray | None = None,
-    c: float = C_VISCOUS,
+    c_viscous: np.ndarray = C_VISCOUS,
+    c_coulomb: np.ndarray = C_COULOMB,
 ) -> np.ndarray:
     """初期状態から n_steps + 1 点の軌道を生成する。
 
@@ -106,7 +133,7 @@ def simulate(
     traj = [initial_state]
     state = initial_state
     for t in range(n_steps):
-        state = rk4_step(state, dt, tau_seq[t], c)
+        state = rk4_step(state, dt, tau_seq[t], c_viscous, c_coulomb)
         traj.append(state)
     return np.stack(traj, axis=0)
 
