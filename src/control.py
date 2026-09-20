@@ -19,7 +19,10 @@ KP = 6.0
 KI = 0.3
 KD = 6.0
 TAU_MAX = 1.0  # 学習データのTAU_RANGEと揃える(この範囲外は未学習領域になる)
-INTEGRAL_CLIP = 2.0
+# M4 (#7): 2.0では一部のICでjoint2の積分項がクリップに張り付き、生成トルクが
+# クーロン摩擦(0.02)とほぼ同じ大きさにしかならず漸近的に固着することが判明。
+# 4.0に引き上げて全12ICで解消することを確認(それ以上に上げても変化なし)。
+INTEGRAL_CLIP = 4.0
 
 
 def angular_error(q: np.ndarray, target: np.ndarray) -> np.ndarray:
