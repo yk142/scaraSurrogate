@@ -2,8 +2,8 @@
 開ループロールアウト誤差を比較する(Phase 1のM2, evaluate_graybox.py相当)。
 
 ブラックボックスはシステムに依存しない`src.model.NSSModel`をそのまま再利用し、
-グレーボックスは重力項G(q)をハードコードした`src.model_vertical.GrayBoxModelVertical`
-を用いる。
+グレーボックスは重力項G(q)・摩擦の関数形をハードコードした
+`src.model_vertical.StructuredFrictionGrayBoxModelVertical`を用いる(Phase2-M8, #36)。
 """
 import matplotlib
 
@@ -17,7 +17,7 @@ plt.rcParams["font.family"] = "Noto Sans CJK JP"
 from src.dataset import sample_initial_states
 from src.dataset_vertical import TAU_RANGE, generate_controlled_trajectories
 from src.model import AutoregressiveModel, NSSModel
-from src.model_vertical import GrayBoxModelVertical
+from src.model_vertical import StructuredFrictionGrayBoxModelVertical
 from src.physics_vertical import simulate as simulate_vertical
 from src.rollout import rmse_curve, true_rollout
 from src.train_vertical import CURRICULUM, DT, SEED, train
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     torch.manual_seed(SEED)
     np.random.seed(SEED)
-    graybox = train(curriculum=CURRICULUM, model_cls=GrayBoxModelVertical)
+    graybox = train(curriculum=CURRICULUM, model_cls=StructuredFrictionGrayBoxModelVertical)
 
     blackbox_curves = rmse_at_horizon(blackbox, conditions)
     graybox_curves = rmse_at_horizon(graybox, conditions)

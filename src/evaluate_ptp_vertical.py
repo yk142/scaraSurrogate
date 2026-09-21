@@ -14,7 +14,7 @@ plt.rcParams["font.family"] = "Noto Sans CJK JP"
 from src.control import angular_error
 from src.control_vertical import PTPControllerVertical, run_ptp_surrogate, run_ptp_true
 from src.model import AutoregressiveModel, NSSModel
-from src.model_vertical import GrayBoxModelVertical
+from src.model_vertical import StructuredFrictionGrayBoxModelVertical
 from src.train_vertical import CURRICULUM, DT, SEED, train
 
 TARGET = np.array([0.5, -0.5])
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     torch.manual_seed(SEED)
     np.random.seed(SEED)
-    graybox = train(curriculum=CURRICULUM, model_cls=GrayBoxModelVertical)
+    graybox = train(curriculum=CURRICULUM, model_cls=StructuredFrictionGrayBoxModelVertical)
 
     results = evaluate_all(blackbox, graybox)
     plot_representative_trajectory(blackbox, graybox)

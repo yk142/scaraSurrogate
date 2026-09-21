@@ -17,7 +17,7 @@ plt.rcParams["font.family"] = "Noto Sans CJK JP"
 
 from src.control_vertical import PTPControllerVertical
 from src.evaluate_ptp_vertical import TARGET
-from src.model_vertical import GrayBoxModelVertical
+from src.model_vertical import StructuredFrictionGrayBoxModelVertical
 from src.physics_vertical import friction_torque
 from src.train_vertical import CURRICULUM, DT, SEED, train
 
@@ -43,7 +43,7 @@ def run_graybox_closed_loop(graybox, initial_state, target, n_steps, dt):
 def main() -> None:
     torch.manual_seed(SEED)
     np.random.seed(SEED)
-    graybox = train(curriculum=CURRICULUM, model_cls=GrayBoxModelVertical)
+    graybox = train(curriculum=CURRICULUM, model_cls=StructuredFrictionGrayBoxModelVertical)
 
     states, taus = run_graybox_closed_loop(graybox, IC, TARGET, N_STEPS, DT)
     q_dot = states[:-1, 2:]

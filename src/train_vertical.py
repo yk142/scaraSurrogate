@@ -51,9 +51,19 @@ def train(
     u_val_t = torch.as_tensor(u_val, dtype=torch.float32, device=device)
     target_enc_val = encode_state(torch.as_tensor(targets_val, dtype=torch.float32, device=device))
 
+    # Phase2-M8 (#36): encode_stateの角速度成分(qd1,qd2)は角度成分
+    # (sin/cos)より分散が桁違いに大きい(Phase2で約28倍、Phase1で約10倍)ため、
+    # 素のMSEでは損失のほとんどが角速度誤差に占められ、PTP制御で重要な角度
+    # 精度への実効的な重みが小さくなっていた。学習データの標準偏差で各
+    # チャンネルを正規化してから二乗誤差を取ることで、全成分が均等に
+    # 損失へ寄与するようにする。
+    channel_std = target_enc_train.std(dim=(0, 1), keepdim=True).clamp_min(1e-3)
+
+    def loss_fn(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return (((pred - target) / channel_std) ** 2).mean()
+
     model = model_cls().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-    loss_fn = nn.MSELoss()
 
     n_samples = x0_train_t.shape[0]
     global_epoch = 0
