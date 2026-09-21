@@ -18,6 +18,7 @@ plt.rcParams["font.family"] = "Noto Sans CJK JP"
 from src.control_vertical import PTPControllerVertical
 from src.evaluate_ptp_vertical import TARGET
 from src.model_vertical import GrayBoxModelVertical
+from src.physics import mass_matrix
 from src.physics_vertical import friction_torque
 from src.train_vertical import CURRICULUM, DT, SEED, train
 
@@ -46,14 +47,21 @@ def main() -> None:
     graybox = train(curriculum=CURRICULUM, model_cls=GrayBoxModelVertical)
 
     states, taus = run_graybox_closed_loop(graybox, IC, TARGET, N_STEPS, DT)
+    q2 = states[:-1, 1]
     q_dot = states[:-1, 2:]
 
-    true_friction = friction_torque(q_dot)
+    # 真の摩擦が加速度に与える影響 = -M(q)^-1 @ friction_torque(q_dot)
+    # (Phase2-M7で残差ネットの出力をトルクから加速度に変更したため、比較対象も
+    # 加速度領域に揃える)
+    true_friction_torque = friction_torque(q_dot)
+    M = mass_matrix(q2)
+    true_friction_accel = -np.linalg.solve(M, true_friction_torque[..., None])[..., 0]
+
     with torch.no_grad():
         state_t = torch.as_tensor(states[:-1], dtype=torch.float32)
         tau_t = torch.as_tensor(taus, dtype=torch.float32)
-        pred_residual = graybox.residual_torque(state_t, tau_t).numpy()
-    residual_error = pred_residual - true_friction
+        pred_residual = graybox.residual_accel(state_t, tau_t).numpy()
+    residual_error = pred_residual - true_friction_accel
 
     t = np.arange(N_STEPS) * DT
     t_state = np.arange(N_STEPS + 1) * DT
@@ -76,13 +84,13 @@ def main() -> None:
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
     for i, joint_label in enumerate(["joint1", "joint2"]):
         ax = axes[i]
-        ax.plot(t, true_friction[:, i], label="真の摩擦トルク", linewidth=1.2)
+        ax.plot(t, true_friction_accel[:, i], label="真の摩擦による加速度", linewidth=1.2)
         ax.plot(t, pred_residual[:, i], "--", label="グレーボックスの残差予測", linewidth=1.0)
         ax.set_xlabel("time [s]")
-        ax.set_ylabel("torque [Nm]")
+        ax.set_ylabel("accel [rad/s^2]")
         ax.set_title(joint_label, fontsize=10)
         ax.legend(fontsize=8)
-    fig.suptitle("グレーボックス自身の軌道上での摩擦推定(真値 vs 実際に使った予測)")
+    fig.suptitle("グレーボックス自身の軌道上での摩擦推定(加速度領域、真値 vs 実際に使った予測)")
     plt.tight_layout()
     plt.savefig(f"{OUT_DIR}/vertical_oscillation_friction.png", dpi=150)
     plt.close()

@@ -32,20 +32,24 @@ def gravity_vector_torch(q1: torch.Tensor, q2: torch.Tensor, g: float = GRAVITY)
 
 class GrayBoxModelVertical(AutoregressiveModel):
     """グレーボックス版(垂直面): M(q), C(q,q_dot), G(q)をハードコードし、
-    NNは関節摩擦トルク(未知項)のみを学習する。
+    NNは摩擦による加速度への影響(未知項)を直接学習する。
 
-        M(q) q_ddot + C(q,q_dot) q_dot + G(q) + residual_torque(state,u) = tau
+        q_ddot = M(q)^-1 @ (tau - C(q,q_dot)@q_dot - G(q)) + residual_accel(state,u)
+
+    Phase2-M7 (#35): 当初はトルクの残差を予測してM(q)^-1で加速度に変換して
+    いたが、M(q)の対角成分が小さい(特にjoint2)ためトルク領域の予測誤差が
+    M(q)^-1を通じて加速度領域・勾配の両方で増幅され、学習が不安定化していた
+    (Phase2-M6参照)。残差を加速度領域で直接予測するよう変更し、この増幅を
+    回避する。
     """
 
-    # Phase2-M6 (#33): 容量を128,3層に引き上げてみたが、k=30ステージの学習が
-    # 不安定化しPTP成功数が悪化した(5/12→0/12)。既定値(64,2層)に戻す。
     def __init__(self, hidden_dim: int = 64, n_hidden_layers: int = 2, dt: float = DT, g: float = GRAVITY):
         super().__init__()
         self.net = _make_mlp(STATE_ENC_DIM + CONTROL_DIM + 2, CONTROL_DIM, hidden_dim, n_hidden_layers)
         self.dt = dt
         self.g = g
 
-    def residual_torque(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+    def residual_accel(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
         net_in = torch.cat([encode_state(state), u, friction_sign_features(state)], dim=-1)
         return self.net(net_in)
 
@@ -58,10 +62,11 @@ class GrayBoxModelVertical(AutoregressiveModel):
         C = coriolis_matrix_torch(q2, q1_dot, q2_dot)
         Cq_dot = torch.einsum("...ij,...j->...i", C, q_dot)
         G = gravity_vector_torch(q1, q2, self.g)
-        residual = self.residual_torque(state, u)
+        residual = self.residual_accel(state, u)
 
-        rhs = (u - Cq_dot - G - residual).unsqueeze(-1)
-        q_ddot = torch.linalg.solve(M, rhs).squeeze(-1)
+        rhs = (u - Cq_dot - G).unsqueeze(-1)
+        q_ddot_known = torch.linalg.solve(M, rhs).squeeze(-1)
+        q_ddot = q_ddot_known + residual
         return torch.cat([q_dot, q_ddot], dim=-1)
 
     def step(self, state: torch.Tensor, u: torch.Tensor | None = None) -> torch.Tensor:
