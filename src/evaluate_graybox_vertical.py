@@ -3,7 +3,7 @@
 
 ブラックボックスはシステムに依存しない`src.model.NSSModel`をそのまま再利用し、
 グレーボックスは重力項G(q)・摩擦の関数形をハードコードした
-`src.model_vertical.StructuredFrictionGrayBoxModelVertical`を用いる(Phase2-M8, #37)。
+`src.model_vertical.StructuredFrictionGrayBoxModelVertical`を用いる(Phase2-M8, #36)。
 """
 import matplotlib
 

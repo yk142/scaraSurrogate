@@ -80,7 +80,7 @@ class StructuredFrictionGrayBoxModelVertical(AutoregressiveModel):
     し、NNは使わず係数(粘性・クーロンとも関節ごと1個ずつ、計4個)だけを
     学習パラメータにする。
 
-    Phase2-M4/M8 (#29, #37) で、自由なMLPの残差ネットが摩擦の線形ゲイン
+    Phase2-M4/M8 (#29, #36) で、自由なMLPの残差ネットが摩擦の線形ゲイン
     (viscous係数)を学習しきれず持続振動が生じることが判明したため、
     関数形自体を既知として埋め込み、未知の大きさ(係数)だけを推定する
     設計にする(DeLaN等のトルク分離手法と同じ考え方)。

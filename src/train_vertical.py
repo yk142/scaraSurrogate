@@ -51,7 +51,7 @@ def train(
     u_val_t = torch.as_tensor(u_val, dtype=torch.float32, device=device)
     target_enc_val = encode_state(torch.as_tensor(targets_val, dtype=torch.float32, device=device))
 
-    # Phase2-M8 (#37): encode_stateの角速度成分(qd1,qd2)は角度成分
+    # Phase2-M8 (#36): encode_stateの角速度成分(qd1,qd2)は角度成分
     # (sin/cos)より分散が桁違いに大きい(Phase2で約28倍、Phase1で約10倍)ため、
     # 素のMSEでは損失のほとんどが角速度誤差に占められ、PTP制御で重要な角度
     # 精度への実効的な重みが小さくなっていた。学習データの標準偏差で各

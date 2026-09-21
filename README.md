@@ -186,7 +186,7 @@ pip install -r requirements.txt
   (M(q)^-1による勾配増幅の回避を狙う)を試したが、同一学習予算では収束
   自体が悪化し(k=30 train_loss: 0.004→1.3)、PTP成功数も5/12→0/12に
   悪化。マージせず知見のみ記録。
-- **Phase2-M8** (完了, #37): 文献調査([Neural Robot Dynamics](https://arxiv.org/html/2508.15755v1)、
+- **Phase2-M8** (完了, #36): 文献調査([Neural Robot Dynamics](https://arxiv.org/html/2508.15755v1)、
   DeLaN系のトルク分離手法等)を踏まえ、2つの変更を組み合わせた:
   (1) 学習損失をencode_stateの各成分の標準偏差で正規化(角速度成分の分散が
   角度成分の約28倍あり、素のMSEでは角度精度への実効的な重みが小さすぎた)、
