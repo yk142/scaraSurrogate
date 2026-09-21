@@ -37,10 +37,9 @@ class GrayBoxModelVertical(AutoregressiveModel):
         M(q) q_ddot + C(q,q_dot) q_dot + G(q) + residual_torque(state,u) = tau
     """
 
-    # Phase2-M6 (#33): 摩擦係数のスケールが大きい(Phase 1比)ため、既定の容量
-    # (64, 2層)では残差ネットが必要な線形ゲインを学習しきれず持続振動が発生
-    # した(M4/M5参照)。容量を引き上げる。
-    def __init__(self, hidden_dim: int = 128, n_hidden_layers: int = 3, dt: float = DT, g: float = GRAVITY):
+    # Phase2-M6 (#33): 容量を128,3層に引き上げてみたが、k=30ステージの学習が
+    # 不安定化しPTP成功数が悪化した(5/12→0/12)。既定値(64,2層)に戻す。
+    def __init__(self, hidden_dim: int = 64, n_hidden_layers: int = 2, dt: float = DT, g: float = GRAVITY):
         super().__init__()
         self.net = _make_mlp(STATE_ENC_DIM + CONTROL_DIM + 2, CONTROL_DIM, hidden_dim, n_hidden_layers)
         self.dt = dt
