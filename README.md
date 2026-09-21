@@ -154,6 +154,16 @@ pip install -r requirements.txt
   ランダムトルク条件: 0.43→0.20)だが、Phase 1(7〜9倍)ほどの差ではなく、
   重力+カオス性のある系ではグレーボックス化の恩恵がやや小さくなることが
   分かった。
+- **Phase2-M3** (完了, #27): 重力補償項G(q)込みの計算トルク法PTP制御を
+  `src/control_vertical.py`に実装。C_VISCOUS=2.0という大きな摩擦に対して
+  Phase 1のゲイン(KP=6,KD=6)では収束が弱すぎ0/12ICしか成功しなかったため、
+  ゲインを大幅に引き上げ(KP=30, KD=22, KI=3.5)て真の物理モデルは12/12
+  成功を達成。しかし**グレーボックスは3/12しか成功せず**(ブラックボックスは
+  0/12)、代表試行ではtheta2に真値にはない持続的な振動(減衰しないリミット
+  サイクル的な挙動)が見られた。Phase2-M2で示唆した通り、重力+カオス性の
+  ある系では、既知の物理構造を使っても残る摩擦推定誤差が閉ループ制御下で
+  拡大しやすく、グレーボックス化だけでは実用レベルの制御精度に届かない
+  ことが判明。追加調査は別Issueで継続する。
 
 ## ディレクトリ構成
 
@@ -176,6 +186,8 @@ src/
   model_vertical.py        # Phase2: GrayBoxModelVertical(慣性行列+コリオリ項+重力項+残差)
   train_vertical.py        # Phase2: 学習ループ
   evaluate_graybox_vertical.py  # Phase2: ブラックボックス vs グレーボックスの比較
+  control_vertical.py      # Phase2: 重力補償込みの計算トルク法PTPコントローラ
+  evaluate_ptp_vertical.py # Phase2: PTP制御の3条件比較・プロット生成
 tests/
   test_physics.py
   test_model.py
@@ -183,4 +195,5 @@ tests/
   test_evaluate_transient.py
   test_physics_vertical.py
   test_model_vertical.py
+  test_control_vertical.py
 ```
