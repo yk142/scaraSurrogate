@@ -14,8 +14,11 @@ from src.model_vertical import GrayBoxModelVertical
 
 DT = 0.02
 N_STEPS_PER_TRAJ = 50
-N_TRAIN_TRAJ = 600
-N_VAL_TRAJ = 80
+# Phase2-M6 (#33): 摩擦係数のスケールが大きく学習が難しいため、Phase 1と
+# 同じデータ量・エポック数では残差ネットが十分学習できなかった(M4/M5参照)。
+# データ量・エポック数を増やす。
+N_TRAIN_TRAJ = 1200
+N_VAL_TRAJ = 160
 SEED = 0
 BATCH_SIZE = 512
 LR = 1e-3
@@ -24,7 +27,7 @@ GRAD_CLIP_NORM = 1.0
 K_MAX = 30
 WINDOW_STRIDE = 2
 
-CURRICULUM = [(1, 40), (3, 30), (5, 30), (10, 30), (20, 30), (K_MAX, 40)]
+CURRICULUM = [(1, 60), (3, 45), (5, 45), (10, 45), (20, 45), (K_MAX, 60)]
 
 
 def train(
