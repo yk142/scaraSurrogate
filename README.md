@@ -141,6 +141,19 @@ pip install -r requirements.txt
   `src/physics_vertical.py`に実装。Phase 1の`M(q)`, `C(q,q̇)`をそのまま再利用し、
   重力項`G(q)`を追加。無トルク・無摩擦での力学的全エネルギー保存(相対変動
   6.31e-04)、鉛直下向き(q1=-π/2, q2=0)が不動点であることを検証した。
+- **Phase2-M2** (完了, #25): データセット生成・NSSモデル(ブラックボックス/
+  グレーボックス)を実装。**Phase 1の摩擦係数(粘性0.05)をそのまま流用すると、
+  重力+リンク2の小さい慣性によるカオス的な二重振り子効果でランダムIC・
+  ランダムトルクの軌道がほぼ全て角速度数十rad/s(非現実的)まで発散する
+  ことが判明**。実機ロボットアームの減速機・モータ由来の粘性摩擦を模して
+  `C_VISCOUS`を0.05→2.0に引き上げ、現実的な速度域(数rad/s)に収めた
+  (念のため角速度上限を超える軌道を棄却して引き直す安全弁も追加)。
+  ブラックボックスは重力なしPhase 1と共通の`NSSModel`をそのまま再利用、
+  グレーボックスは重力項`G(q)`をハードコードした`GrayBoxModelVertical`を新設。
+  開ループロールアウトRMSEでグレーボックスが優位(ゼロトルク条件: 0.39→0.28、
+  ランダムトルク条件: 0.43→0.20)だが、Phase 1(7〜9倍)ほどの差ではなく、
+  重力+カオス性のある系ではグレーボックス化の恩恵がやや小さくなることが
+  分かった。
 
 ## ディレクトリ構成
 
@@ -159,10 +172,15 @@ src/
   diagnose_saturation.py   # 大オフセットIC(トルク飽和領域)の診断
   physics_vertical.py      # Phase2: 重力あり垂直面2関節アームの真値シミュレータ
   verify_physics_vertical.py  # Phase2: 物理シミュレータの検証プロット生成
+  dataset_vertical.py      # Phase2: データセット生成(角速度上限による棄却サンプリング付き)
+  model_vertical.py        # Phase2: GrayBoxModelVertical(慣性行列+コリオリ項+重力項+残差)
+  train_vertical.py        # Phase2: 学習ループ
+  evaluate_graybox_vertical.py  # Phase2: ブラックボックス vs グレーボックスの比較
 tests/
   test_physics.py
   test_model.py
   test_control.py
   test_evaluate_transient.py
   test_physics_vertical.py
+  test_model_vertical.py
 ```

@@ -18,8 +18,11 @@ from src.physics import LC1, LC2, L1, M1, M2, coriolis_matrix, kinetic_energy, m
 
 GRAVITY = 9.81
 
-# 摩擦係数は水平面版と同じデフォルト値を踏襲する。
-C_VISCOUS = np.array([0.05, 0.05])
+# Phase2-M2 (#25): 水平面版と同じ摩擦係数(0.05)では、重力+リンク2の小さい慣性に
+# よるカオス的な二重振り子効果でランダムIC・ランダムトルクの軌道がほぼ全て
+# 角速度数十rad/s(非現実的)まで発散することが判明した。実機ロボットアームの
+# 減速機・モータ由来の粘性摩擦を模して大幅に引き上げ、現実的な速度域に収める。
+C_VISCOUS = np.array([2.0, 2.0])
 C_COULOMB = np.array([0.02, 0.02])
 V_STRIBECK = 0.03
 

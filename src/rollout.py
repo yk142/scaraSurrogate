@@ -1,17 +1,25 @@
 """自己回帰ロールアウトと誤差指標の計算。"""
+from typing import Callable
+
 import numpy as np
 
-from src.physics import simulate
+from src.physics import simulate as simulate_horizontal
 
 
 def true_rollout(
-    initial_states: np.ndarray, dt: float, n_steps: int, tau_seq: np.ndarray | None = None
+    initial_states: np.ndarray,
+    dt: float,
+    n_steps: int,
+    tau_seq: np.ndarray | None = None,
+    simulate_fn: Callable = simulate_horizontal,
 ) -> np.ndarray:
     """shape (n_ic, n_steps+1, 4)
 
     tau_seq: shape (n_steps, 2)。全ICに共通のトルク列として適用する。
+    simulate_fn: 既定は水平面版(Phase 1)。垂直面版(Phase 2)は
+    `src.physics_vertical.simulate`を渡す。
     """
-    return np.stack([simulate(s0, dt, n_steps, tau=tau_seq) for s0 in initial_states], axis=0)
+    return np.stack([simulate_fn(s0, dt, n_steps, tau=tau_seq) for s0 in initial_states], axis=0)
 
 
 def rmse_curve(true_traj: np.ndarray, pred_traj: np.ndarray) -> np.ndarray:
