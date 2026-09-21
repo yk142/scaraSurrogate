@@ -44,6 +44,22 @@ C21 = -h*θ̇1,  C22 = 0
 無トルク・無摩擦なら全運動エネルギー `0.5 * q̇ᵀ M(q) q̇` が保存される(水平面のため
 位置エネルギーがない)ことが、シミュレータ正しさの基本的な検証になる。
 
+## 力学モデル(Phase 2: 垂直面、重力あり)
+
+Phase 1と同じ`M(q)`, `C(q,q̇)`(角度の取り方が同じなら同一の式)に加えて、
+重力項`G(q)`が入る:
+
+```
+M(q) q̈ + C(q, q̇) q̇ + G(q) + F(q̇) = τ
+
+G1 = (m1*lc1 + m2*l1)*g*cos(q1) + m2*lc2*g*cos(q1+q2)
+G2 = m2*lc2*g*cos(q1+q2)
+```
+
+q1は水平(x軸正方向)を基準とした絶対角、q2はリンク1に対する相対角。無トルク・
+無摩擦なら力学的全エネルギー(運動エネルギー+位置エネルギー)が保存されることが
+検証になる。鉛直下向き(q1=-π/2, q2=0)は重力トルクが0になる不動点。
+
 ## セットアップ
 
 ```bash
@@ -119,6 +135,13 @@ pip install -r requirements.txt
   摩擦の滑らか化で真の系の実効的な静止摩擦(スティクション)が弱まり収束が
   遅くなったため、PID制御の積分ゲイン`KI`を0.3→0.8に再チューニングした。
 
+### Phase 2(垂直面2関節アーム、重力あり)
+
+- **Phase2-M1** (完了, #23): 重力あり垂直面2関節アームの真値シミュレータを
+  `src/physics_vertical.py`に実装。Phase 1の`M(q)`, `C(q,q̇)`をそのまま再利用し、
+  重力項`G(q)`を追加。無トルク・無摩擦での力学的全エネルギー保存(相対変動
+  6.31e-04)、鉛直下向き(q1=-π/2, q2=0)が不動点であることを検証した。
+
 ## ディレクトリ構成
 
 ```
@@ -131,8 +154,15 @@ src/
   evaluate_graybox.py  # ブラックボックス vs グレーボックスの比較・プロット生成
   control.py           # 計算トルク法によるPTPコントローラ(積分項つき)
   evaluate_ptp.py      # PTP制御の3条件比較・プロット生成
+  evaluate_transient.py    # 整定時間・過渡応答全体の比較評価
+  diagnose_overshoot.py    # グレーボックスの摩擦推定誤差の診断
+  diagnose_saturation.py   # 大オフセットIC(トルク飽和領域)の診断
+  physics_vertical.py      # Phase2: 重力あり垂直面2関節アームの真値シミュレータ
+  verify_physics_vertical.py  # Phase2: 物理シミュレータの検証プロット生成
 tests/
   test_physics.py
   test_model.py
   test_control.py
+  test_evaluate_transient.py
+  test_physics_vertical.py
 ```
