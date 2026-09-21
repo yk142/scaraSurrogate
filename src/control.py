@@ -16,7 +16,11 @@ import numpy as np
 from src.physics import coriolis_matrix, mass_matrix, rk4_step
 
 KP = 6.0
-KI = 0.3
+# M11 (#21): 真のクーロン摩擦をsign(q_dot)からtanh(q_dot/V_STRIBECK)に滑らか化した
+# ことで、静止付近の実効摩擦(≒スティクション)が弱まり収束が遅くなったため、
+# KI=0.3では極端な大オフセットICで30秒以内の収束が間に合わなくなった。0.8に
+# 引き上げて解消(全ICでmax_err=0.013、余裕を持って成功)。
+KI = 0.8
 KD = 6.0
 TAU_MAX = 1.0  # 学習データのTAU_RANGEと揃える(この範囲外は未学習領域になる)
 # M4 (#7): 2.0では一部のICでjoint2の積分項がクリップに張り付き、生成トルクが

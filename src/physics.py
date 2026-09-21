@@ -28,6 +28,14 @@ I2 = M2 * L2**2 / 12  # リンク2の重心まわり慣性モーメント
 C_VISCOUS = np.array([0.05, 0.05])
 C_COULOMB = np.array([0.02, 0.02])
 
+# M11 (#21): クーロン摩擦の方向はnp.sign(q_dot)ではなくtanh(q_dot/V_STRIBECK)で
+# 近似する(Stribeck効果を考慮した滑らかな摩擦モデルとしても物理的に妥当)。
+# M9/M10で、sign(q_dot)の不連続性を連続関数(NN残差ネット)で近似する際に
+# バイアスとチャタリングのトレードオフから逃れられないことが判明したため、
+# 真のモデル側の不連続性そのものを取り除く。グレーボックスのtanh(q_dot/eps)
+# 特徴量(M6, FRICTION_SIGN_EPS)と同じスケールに揃えている。
+V_STRIBECK = 0.03
+
 
 def mass_matrix(q2: np.ndarray) -> np.ndarray:
     """慣性行列 M(q)。q2 の関数のみ(q1には依存しない)。
@@ -63,9 +71,11 @@ def friction_torque(
 ) -> np.ndarray:
     """関節摩擦トルク(粘性+クーロン、各関節独立)。グレーボックスが学ぶべき未知項。
 
+    クーロン摩擦の方向はtanh(q_dot/V_STRIBECK)で近似する(M11 #21)。
+
     q_dot: shape (..., 2) -> shape (..., 2)
     """
-    return c_viscous * q_dot + c_coulomb * np.sign(q_dot)
+    return c_viscous * q_dot + c_coulomb * np.tanh(q_dot / V_STRIBECK)
 
 
 def dynamics(
