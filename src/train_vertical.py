@@ -14,6 +14,8 @@ from src.model_vertical import GrayBoxModelVertical
 
 DT = 0.02
 N_STEPS_PER_TRAJ = 50
+# Phase2-M6 (#33): データ量(1200)・エポック数を増やしてみたが、k=30ステージ
+# の学習がかえって不安定化しPTP成功数が悪化した(5/12→0/12)。既定値に戻す。
 N_TRAIN_TRAJ = 600
 N_VAL_TRAJ = 80
 SEED = 0
