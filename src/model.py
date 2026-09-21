@@ -42,13 +42,26 @@ def decode_state(enc: torch.Tensor) -> torch.Tensor:
     return torch.stack([q1, q2, q1_dot, q2_dot], dim=-1)
 
 
-def _make_mlp(out_dim: int, hidden_dim: int, n_hidden_layers: int) -> nn.Sequential:
-    in_dim = STATE_ENC_DIM + CONTROL_DIM
+def _make_mlp(in_dim: int, out_dim: int, hidden_dim: int, n_hidden_layers: int) -> nn.Sequential:
     layers: list[nn.Module] = [nn.Linear(in_dim, hidden_dim), nn.Tanh()]
     for _ in range(n_hidden_layers - 1):
         layers += [nn.Linear(hidden_dim, hidden_dim), nn.Tanh()]
     layers.append(nn.Linear(hidden_dim, out_dim))
     return nn.Sequential(*layers)
+
+
+FRICTION_SIGN_EPS = 0.05  # sign(q_dot)の滑らかな近似 tanh(q_dot/eps) のスケール
+
+
+def friction_sign_features(state: torch.Tensor) -> torch.Tensor:
+    """(..., 4) state -> (..., 2) [tanh(q1_dot/eps), tanh(q2_dot/eps)]
+
+    M5 (#9) で、残差ネットが q_dot≈0 付近のクーロン摩擦 sign(q_dot) の不連続性を
+    学習しきれず系統的に過小評価することが判明したため、sign(q_dot)の滑らかな
+    近似を明示的な入力特徴量として与える。
+    """
+    q_dot = state[..., 2:]
+    return torch.tanh(q_dot / FRICTION_SIGN_EPS)
 
 
 def mass_matrix_torch(q2: torch.Tensor) -> torch.Tensor:
@@ -126,7 +139,7 @@ class NSSModel(AutoregressiveModel):
 
     def __init__(self, hidden_dim: int = 64, n_hidden_layers: int = 2):
         super().__init__()
-        self.net = _make_mlp(STATE_ENC_DIM, hidden_dim, n_hidden_layers)
+        self.net = _make_mlp(STATE_ENC_DIM + CONTROL_DIM, STATE_ENC_DIM, hidden_dim, n_hidden_layers)
 
     def forward(self, state: torch.Tensor, u: torch.Tensor | None = None) -> torch.Tensor:
         enc = encode_state(state)
@@ -148,11 +161,12 @@ class GrayBoxModel(AutoregressiveModel):
 
     def __init__(self, hidden_dim: int = 64, n_hidden_layers: int = 2, dt: float = DT):
         super().__init__()
-        self.net = _make_mlp(CONTROL_DIM, hidden_dim, n_hidden_layers)
+        # 入力: encode_state + u + sign(q_dot)の滑らかな近似(2次元, M6 #11)
+        self.net = _make_mlp(STATE_ENC_DIM + CONTROL_DIM + 2, CONTROL_DIM, hidden_dim, n_hidden_layers)
         self.dt = dt
 
     def residual_torque(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
-        net_in = torch.cat([encode_state(state), u], dim=-1)
+        net_in = torch.cat([encode_state(state), u, friction_sign_features(state)], dim=-1)
         return self.net(net_in)
 
     def dynamics(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:

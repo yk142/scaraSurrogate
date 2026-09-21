@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from src.model import GrayBoxModel, NSSModel, coriolis_matrix_torch, mass_matrix_torch
+from src.model import GrayBoxModel, NSSModel, coriolis_matrix_torch, friction_sign_features, mass_matrix_torch
 from src.physics import coriolis_matrix, mass_matrix, rk4_step
 
 
@@ -62,3 +62,12 @@ def test_graybox_rollout_output_shape():
     model = GrayBoxModel()
     traj = model.rollout(np.array([0.1, 0.2, 0.0, 0.0]), n_steps=10)
     assert traj.shape == (11, 4)
+
+
+def test_friction_sign_features_approximates_sign():
+    """M6 (#11): tanh(q_dot/eps)は大きな|q_dot|でsign(q_dot)に、q_dot=0で0に近づくこと。"""
+    state = torch.tensor([[0.0, 0.0, 2.0, -2.0], [0.0, 0.0, 0.0, 0.0]])
+    features = friction_sign_features(state).numpy()
+
+    assert np.allclose(features[0], [1.0, -1.0], atol=1e-3)
+    assert np.allclose(features[1], [0.0, 0.0], atol=1e-9)
