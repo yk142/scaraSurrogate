@@ -72,3 +72,54 @@ class GrayBoxModelVertical(AutoregressiveModel):
         k3 = self.dynamics(state + 0.5 * dt * k2, u)
         k4 = self.dynamics(state + dt * k3, u)
         return state + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+
+
+class StructuredFrictionGrayBoxModelVertical(AutoregressiveModel):
+    """グレーボックス版(垂直面, 摩擦を構造化): M(q), C(q,q_dot), G(q)に加え、
+    摩擦の関数形(粘性+クーロン、Stribeck風の滑らかな近似)自体もハードコード
+    し、NNは使わず係数(粘性・クーロンとも関節ごと1個ずつ、計4個)だけを
+    学習パラメータにする。
+
+    Phase2-M4/M8 (#29, #37) で、自由なMLPの残差ネットが摩擦の線形ゲイン
+    (viscous係数)を学習しきれず持続振動が生じることが判明したため、
+    関数形自体を既知として埋め込み、未知の大きさ(係数)だけを推定する
+    設計にする(DeLaN等のトルク分離手法と同じ考え方)。
+    """
+
+    def __init__(self, dt: float = DT, g: float = GRAVITY, v_stribeck: float = 0.03):
+        super().__init__()
+        self.log_c_viscous = torch.nn.Parameter(torch.zeros(2))
+        self.log_c_coulomb = torch.nn.Parameter(torch.zeros(2))
+        self.dt = dt
+        self.g = g
+        self.v_stribeck = v_stribeck
+
+    def residual_torque(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+        q_dot = state[..., 2:]
+        c_viscous = torch.exp(self.log_c_viscous)
+        c_coulomb = torch.exp(self.log_c_coulomb)
+        return c_viscous * q_dot + c_coulomb * torch.tanh(q_dot / self.v_stribeck)
+
+    def dynamics(self, state: torch.Tensor, u: torch.Tensor) -> torch.Tensor:
+        q, q_dot = state[..., :2], state[..., 2:]
+        q1, q2 = q[..., 0], q[..., 1]
+        q1_dot, q2_dot = q_dot[..., 0], q_dot[..., 1]
+
+        M = mass_matrix_torch(q2)
+        C = coriolis_matrix_torch(q2, q1_dot, q2_dot)
+        Cq_dot = torch.einsum("...ij,...j->...i", C, q_dot)
+        G = gravity_vector_torch(q1, q2, self.g)
+        residual = self.residual_torque(state, u)
+
+        rhs = (u - Cq_dot - G - residual).unsqueeze(-1)
+        q_ddot = torch.linalg.solve(M, rhs).squeeze(-1)
+        return torch.cat([q_dot, q_ddot], dim=-1)
+
+    def step(self, state: torch.Tensor, u: torch.Tensor | None = None) -> torch.Tensor:
+        u = self._default_u(state, u)
+        dt = self.dt
+        k1 = self.dynamics(state, u)
+        k2 = self.dynamics(state + 0.5 * dt * k1, u)
+        k3 = self.dynamics(state + 0.5 * dt * k2, u)
+        k4 = self.dynamics(state + dt * k3, u)
+        return state + (dt / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
