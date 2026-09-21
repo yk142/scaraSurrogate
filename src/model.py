@@ -50,7 +50,9 @@ def _make_mlp(in_dim: int, out_dim: int, hidden_dim: int, n_hidden_layers: int) 
     return nn.Sequential(*layers)
 
 
-FRICTION_SIGN_EPS = 0.05  # sign(q_dot)の滑らかな近似 tanh(q_dot/eps) のスケール
+FRICTION_SIGN_EPS = 0.01  # sign(q_dot)の滑らかな近似 tanh(q_dot/eps) のスケール
+# M8 (#15): 0.05ではPTP収束中の|q_dot|<0.05領域でtanh特徴量がsign(q_dot)から
+# 乖離し、joint1の摩擦推定バイアスが残っていたため0.01に縮小。
 
 
 def friction_sign_features(state: torch.Tensor) -> torch.Tensor:
