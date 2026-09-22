@@ -45,6 +45,18 @@ C_COULOMB = np.array([0.4, 0.4, 0.4])
 
 _A = M1 * LC1**2 + I1
 
+# Phase3-M2 (#52): 腕がヨー軸(鉛直)と一直線に伸びる姿勢(q1≈-pi/2かつq2≈-pi等)
+# では、腕の水平方向への張り出しが0になりM00(ヨー軸まわりの慣性)が0に近づく
+# 運動学的特異点が存在する(実機ロボットの手首特異点と同種の現象)。この近傍で
+# 質量行列を逆行列計算すると発散する。
+# 当初max(m00,floor)というハードクランプで正則化したが、これはラグランジュ
+# 力学の構造を破り、特異点通過時に力学的エネルギーが数倍に跳ね上がる
+# アーティファクトを生んだ(不連続な変更のため)。代わりに、ヨー軸に常に存在する
+# 微小なロータ慣性(モータ・エンコーダ由来、実機でも一般的)としてM00に定数を
+# 加算する滑らかな正則化にする。これは有効ラグランジアンへの正当な項の追加で
+# あり、通常の動作範囲への影響は無視できるほど小さい。
+M00_EPSILON = 0.02
+
 
 def _arm_radius(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     """腕の水平方向への張り出し半径 B(q1,q2) = l1*cos(q1) + lc2*cos(q1+q2)"""
@@ -54,7 +66,7 @@ def _arm_radius(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
 def mass_matrix_3d(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
     """質量行列M(q)。shape (...,) -> shape (..., 3, 3)。ヨー・ピッチでブロック対角。"""
     B = _arm_radius(q1, q2)
-    m00 = _A * np.cos(q1) ** 2 + M2 * B**2 + I2 * np.cos(q1 + q2) ** 2
+    m00 = _A * np.cos(q1) ** 2 + M2 * B**2 + I2 * np.cos(q1 + q2) ** 2 + M00_EPSILON
     m_pitch = mass_matrix(q2)  # shape (..., 2, 2)
 
     M = np.zeros(q1.shape + (3, 3))

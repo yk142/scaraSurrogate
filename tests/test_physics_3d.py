@@ -27,6 +27,25 @@ def test_hanging_down_with_no_yaw_velocity_is_fixed_point():
     assert np.allclose(traj, initial_state, atol=1e-9)
 
 
+def test_energy_conserved_through_kinematic_singularity():
+    """腕がヨー軸と一直線になる運動学的特異点(M00→0)を通過する軌道でも、
+    M00_EPSILON正則化により力学的全エネルギーが保存されること(Phase3-M2 #52)。
+    """
+    # q1=-pi/2, q2=0 は腕がヨー軸と一直線(M00がM00_EPSILON近くまで下がる)。
+    initial_state = np.array([0.0, -np.pi / 2 + 0.05, 0.0, 0.5, 0.0, 0.0])
+    dt = 0.005
+    n_steps = 2000  # 10秒分
+
+    traj = simulate(initial_state, dt, n_steps, tau=None, c_viscous=ZERO_FRICTION, c_coulomb=ZERO_FRICTION)
+
+    m00 = mass_matrix_3d(traj[:, 1], traj[:, 2])[:, 0, 0]
+    assert m00.min() < 0.05  # 特異点付近を実際に通過していることを確認
+
+    e = total_energy(traj)
+    max_rel_drift = np.max(np.abs(e - e[0])) / np.abs(e[0])
+    assert max_rel_drift < 1e-3
+
+
 def test_mass_matrix_is_block_diagonal():
     """質量行列はヨー(q0)とピッチ(q1,q2)についてブロック対角であること。"""
     M = mass_matrix_3d(np.array(0.4), np.array(-0.6))
