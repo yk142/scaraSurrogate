@@ -359,7 +359,16 @@ pip install -r requirements.txt
   Phase2-M13相当の教訓を最初から適用した効果が顕著で、**開ループロールアウト
   RMSEでグレーボックスがブラックボックスの1000倍以上優位**(ゼロトルク条件:
   2.36→0.001、ランダムトルク条件: 1.68→0.0002)という、これまでで最も
-  大きな差を達成した。
+  大きな差を達成した。学習された摩擦係数(粘性1.0000/0.9999/0.9998、
+  クーロン0.4000/0.4000/0.4008)は真値とほぼ完全に一致し、特にクーロン係数
+  は初期値1.0から学習を通じて真値0.4まで大きく動いたことから、トリビアルな
+  一致ではなく実際に勾配降下で学習されたことを確認した。
+- **Phase3-M3** (完了, #54): 重力補償込みの計算トルク法PTP制御を
+  `src/control_3d.py`に実装。Phase2最終値(KP=30,KI=3.5,KD=22)がそのまま
+  真の物理モデルで12/12成功し、ゲイン再調整は不要だった。**PTP最終誤差は
+  全12ICで真値・グレーボックスが小数点以下まで一致**(例: 0.0740 vs
+  0.0737)し、ブラックボックスは全12ICで完全に破綻(0/12、誤差0.90前後で
+  高止まり)。Phase 3でもPhase 1/2と同水準の実用的な制御精度を確認した。
 
 ## ディレクトリ構成
 
@@ -394,6 +403,8 @@ src/
   model_3d.py              # Phase3: NSSModel3D / StructuredFrictionGrayBoxModel3D
   train_3d.py              # Phase3: 学習ループ
   evaluate_graybox_3d.py   # Phase3: ブラックボックス vs グレーボックスの比較
+  control_3d.py            # Phase3: 重力補償込みの計算トルク法PTPコントローラ
+  evaluate_ptp_3d.py       # Phase3: PTP制御の3条件比較・プロット生成
 tests/
   test_physics.py
   test_model.py
@@ -404,4 +415,5 @@ tests/
   test_control_vertical.py
   test_physics_3d.py
   test_model_3d.py
+  test_control_3d.py
 ```
